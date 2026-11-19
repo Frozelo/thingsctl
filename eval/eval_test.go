@@ -6,8 +6,12 @@
 //
 //	go test -tags eval ./eval -run TestEval -timeout 2h -v
 //
-// Env: EVAL_OUT (dir), EVAL_SURFACES (tools,ops), EVAL_TASKS (regexp),
-// EVAL_REPS (1), EVAL_PAR (4), EVAL_MODEL, EVAL_EFFORT (medium).
+// Env: EVAL_OUT (dir), EVAL_VARIANTS, EVAL_TASKS (regexp), EVAL_REPS (1),
+// EVAL_PAR (4), EVAL_MODEL, EVAL_EFFORT (medium).
+//
+// EVAL_VARIANTS is a comma list of name=ref:surface. ref is a git commit to
+// build the server from, or "." for the working tree. Default:
+// tools=.:tools,ops=.:ops.
 package eval
 
 import (
@@ -57,9 +61,9 @@ func TestEval(t *testing.T) {
 	out := env("EVAL_OUT", t.TempDir())
 	out, _ = filepath.Abs(out)
 	os.MkdirAll(filepath.Join(out, "runs"), 0o755)
-	bin := filepath.Join(out, "simserver")
-	if b, err := exec.Command("go", "build", "-tags", "eval", "-o", bin, "./simserver").CombinedOutput(); err != nil {
-		t.Fatalf("build: %v\n%s", err, b)
+	variants, err := buildVariants(out, env("EVAL_VARIANTS", "tools=.:tools,ops=.:ops"))
+	if err != nil {
+		t.Fatal(err)
 	}
 	today := thingsdb.DateOf(time.Now())
 	seed := filepath.Join(out, "seed.sqlite")
@@ -77,7 +81,8 @@ func TestEval(t *testing.T) {
 	ids, _ := snap.AllIDs()
 	snap.Close()
 	db.Close()
-	n := norm{ids: shortid.New(ids), today: today, containers: map[string]string{
+	titles, _ := taskTitles(seed)
+	n := norm{ids: shortid.New(ids), today: today, titles: titles, containers: map[string]string{
 		"home": AreaHome, "work": AreaWork, "health": AreaHealth,
 		"website redesign": ProjWebsite, "q4 budget": ProjBudget, "kitchen renovation": ProjKitchen,
 		"taxes 2026": ProjTaxes, "learn spanish": ProjSpanish,
@@ -94,20 +99,23 @@ func TestEval(t *testing.T) {
 		}
 		tasks = keep
 	}
-	surfaces := strings.Split(env("EVAL_SURFACES", "tools,ops"), ",")
+	var surfaces []string
+	for _, v := range variants {
+		surfaces = append(surfaces, v.name)
+	}
 	reps, _ := strconv.Atoi(env("EVAL_REPS", "1"))
 	par, _ := strconv.Atoi(env("EVAL_PAR", "4"))
 
 	type job struct {
 		task    Task
-		surface string
+		variant variant
 		rep     int
 	}
 	var jobs []job
 	for rep := 1; rep <= reps; rep++ {
 		for _, tk := range tasks {
-			for _, s := range surfaces {
-				jobs = append(jobs, job{tk, s, rep})
+			for _, v := range variants {
+				jobs = append(jobs, job{tk, v, rep})
 			}
 		}
 	}
@@ -120,7 +128,7 @@ func TestEval(t *testing.T) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			r := runOne(out, bin, seed, j.surface, j.task, j.rep)
+			r := runOne(out, j.variant, seed, j.task, j.rep)
 			if r.RunErr == "" {
 				r.OK, r.Why = j.task.Grade(n, r.Calls, r.Answer)
 			} else {
@@ -141,9 +149,9 @@ func TestEval(t *testing.T) {
 
 const preamble = "You manage the user's Things 3 through the `things` MCP tools. Do the task now, without asking for confirmation, then reply briefly.\n\nTask: "
 
-func runOne(out, bin, seed, surface string, tk Task, rep int) result {
-	r := result{Surface: surface, Task: tk.Name, Rep: rep}
-	dir := filepath.Join(out, "runs", fmt.Sprintf("%s-%s-%d", surface, tk.Name, rep))
+func runOne(out string, v variant, seed string, tk Task, rep int) result {
+	r := result{Surface: v.name, Task: tk.Name, Rep: rep}
+	dir := filepath.Join(out, "runs", fmt.Sprintf("%s-%s-%d", v.name, tk.Name, rep))
 	os.MkdirAll(dir, 0o755)
 	db := filepath.Join(dir, "things.sqlite")
 	if b, err := os.ReadFile(seed); err != nil || os.WriteFile(db, b, 0o644) != nil {
@@ -154,8 +162,8 @@ func runOne(out, bin, seed, surface string, tk Task, rep int) result {
 		"-s", "read-only", "--disable", "shell_tool", "--disable", "unified_exec", "-C", dir,
 		"-c", "approval_policy=\"never\"",
 		"-c", "model_reasoning_effort=\"" + env("EVAL_EFFORT", "medium") + "\"",
-		"-c", fmt.Sprintf("mcp_servers.things.command=%q", bin),
-		"-c", fmt.Sprintf(`mcp_servers.things.args=["--surface",%q]`, surface),
+		"-c", fmt.Sprintf("mcp_servers.things.command=%q", v.bin),
+		"-c", fmt.Sprintf(`mcp_servers.things.args=["--surface",%q]`, v.surface),
 		"-c", fmt.Sprintf("mcp_servers.things.env={THINGS_DB=%q}", db),
 	}
 	if m := os.Getenv("EVAL_MODEL"); m != "" {
@@ -221,6 +229,44 @@ func runOne(out, bin, seed, surface string, tk Task, rep int) result {
 		r.RunErr = "no usage reported: " + strings.TrimSpace(lastLine(stderr.String()))
 	}
 	return r
+}
+
+type variant struct{ name, ref, surface, bin string }
+
+// buildVariants builds one simserver per distinct git ref.
+func buildVariants(out, spec string) ([]variant, error) {
+	var vs []variant
+	built := map[string]string{}
+	for _, part := range strings.Split(spec, ",") {
+		name, rest, ok := strings.Cut(part, "=")
+		ref, surface, ok2 := strings.Cut(rest, ":")
+		if !ok || !ok2 {
+			return nil, fmt.Errorf("bad variant %q; want name=ref:surface", part)
+		}
+		bin, ok := built[ref]
+		if !ok {
+			src := ".."
+			if ref != "." {
+				src = filepath.Join(out, "src", ref)
+				os.RemoveAll(src)
+				os.MkdirAll(src, 0o755)
+				cmd := fmt.Sprintf("git -C .. archive %s | tar -x -C %q", ref, src)
+				if b, err := exec.Command("sh", "-c", cmd).CombinedOutput(); err != nil {
+					return nil, fmt.Errorf("archive %s: %v\n%s", ref, err, b)
+				}
+			}
+			bin = filepath.Join(out, "bin", "simserver-"+strings.ReplaceAll(ref, ".", "worktree"))
+			build := exec.Command("go", "build", "-tags", "eval", "-o", bin, "./eval/simserver")
+			build.Dir = src
+			build.Env = append(os.Environ(), "GOWORK=off")
+			if b, err := build.CombinedOutput(); err != nil {
+				return nil, fmt.Errorf("build %s: %v\n%s", ref, err, b)
+			}
+			built[ref] = bin
+		}
+		vs = append(vs, variant{name, ref, surface, bin})
+	}
+	return vs, nil
 }
 
 func lastLine(s string) string {

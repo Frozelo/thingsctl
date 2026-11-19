@@ -3,6 +3,7 @@
 package eval
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -51,6 +52,7 @@ type Call struct {
 // norm resolves references against the seed.
 type norm struct {
 	ids        *shortid.Index
+	titles     map[string]string // lower task title -> uuid (unique titles only)
 	containers map[string]string // lower title -> uuid
 	today      thingsdb.Date
 }
@@ -59,7 +61,31 @@ func (n norm) id(s string) string {
 	if full, err := n.ids.Resolve(strings.TrimSpace(s)); err == nil {
 		return full
 	}
+	if u, ok := n.titles[strings.ToLower(strings.TrimSpace(s))]; ok {
+		return u
+	}
 	return s
+}
+
+// taskTitles maps the seed's unique task titles to their ids.
+func taskTitles(path string) (map[string]string, error) {
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	rows, err := db.Query(`SELECT lower(title), min(uuid) FROM TMTask WHERE type IN (0,1) GROUP BY lower(title) HAVING count(*)=1`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var t, u string
+		rows.Scan(&t, &u)
+		out[t] = u
+	}
+	return out, rows.Err()
 }
 
 func (n norm) container(s string) string {
