@@ -48,6 +48,7 @@ usage:
   thingsctl show <id|list>        open in the Things window
   thingsctl batch <json|->        send a Things JSON array (bulk create/update)
   thingsctl mcp [flags]           run as an MCP server on stdio (see: thingsctl mcp -h)
+  thingsctl doctor                check database access, permissions and settings
   thingsctl <verb> -h             flags of a verb; thingsctl read help: output format
   thingsctl version
 
@@ -93,6 +94,8 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		})
 	case "mcp":
 		err = runMCP(args[1:], Stdin, stdout)
+	case "doctor":
+		err = runDoctor(args[1:], stdout)
 	case "version", "--version":
 		fmt.Fprintln(stdout, "thingsctl", Version)
 	case "help", "-h", "--help":

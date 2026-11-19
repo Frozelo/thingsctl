@@ -95,7 +95,24 @@ The server is a process of the client app, so that app needs Full Disk Access to
 go install github.com/Frozelo/thingsctl/cmd/thingsctl@latest
 ```
 
-thingsctl needs macOS with Things 3 installed and opened at least once. If macOS denies access to the Things database, grant Full Disk Access to the app that runs thingsctl, such as Terminal, Claude or Cursor.
+thingsctl needs macOS with Things 3 installed and opened at least once. Check the setup with:
+
+```sh
+thingsctl doctor
+```
+
+```
+thingsctl 0.1.0 darwin/arm64
+ok   database: ~/Library/Group Containers/…/main.sqlite (version 29)
+ok   schema: compatible
+warn things urls: off. Only needed to change evening, reminders, headings or checklists of existing items: …
+ok   automation: allowed (Things 3.24.1)
+```
+
+`doctor` changes nothing and never launches Things. It exits with code 1 if a check fails. Two macOS permissions matter, and both belong to the app that runs thingsctl, such as Terminal, Claude or Cursor:
+
+- **Full Disk Access** lets thingsctl read the Things database. Grant it in System Settings → Privacy & Security → Full Disk Access, then restart the app.
+- **Automation → Things3** lets thingsctl send changes to Things. macOS asks for it on the first write.
 
 ## License
 

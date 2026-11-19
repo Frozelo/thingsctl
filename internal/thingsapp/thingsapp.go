@@ -74,7 +74,7 @@ func (System) OpenURL(ctx context.Context, u string, background bool) error {
 
 // EnsureRunning starts Things hidden so AppleScript does not bring it forward.
 func (System) EnsureRunning(ctx context.Context) error {
-	if running() {
+	if Running() {
 		return nil
 	}
 	if err := exec.CommandContext(ctx, "open", "-g", "-b", BundleID).Run(); err != nil {
@@ -82,7 +82,7 @@ func (System) EnsureRunning(ctx context.Context) error {
 	}
 	deadline := time.Now().Add(8 * time.Second)
 	for time.Now().Before(deadline) {
-		if running() {
+		if Running() {
 			time.Sleep(700 * time.Millisecond) // let it open its database
 			return nil
 		}
@@ -91,7 +91,8 @@ func (System) EnsureRunning(ctx context.Context) error {
 	return errors.New("Things did not start within 8s")
 }
 
-func running() bool { return exec.Command("pgrep", "-x", "Things3").Run() == nil }
+// Running reports whether Things is running.
+func Running() bool { return exec.Command("pgrep", "-x", "Things3").Run() == nil }
 
 // Script builds an AppleScript run handler. Values are passed as argv items.
 type Script struct {

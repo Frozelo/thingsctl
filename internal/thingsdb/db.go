@@ -35,6 +35,12 @@ var ErrNotFound = errors.New("Things database not found: is Things 3 installed a
 // Locate returns the path of the Things database. THINGS_DB overrides it.
 func Locate() (string, error) {
 	if p := os.Getenv("THINGS_DB"); p != "" {
+		if _, err := os.Stat(p); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return "", fmt.Errorf("THINGS_DB=%s: no such file", p)
+			}
+			return "", classify(err)
+		}
 		return p, nil
 	}
 	home, err := os.UserHomeDir()
