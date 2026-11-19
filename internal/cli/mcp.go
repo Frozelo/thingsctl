@@ -27,7 +27,8 @@ example client config:
   {"mcpServers":{"things":{"command":"thingsctl","args":["mcp"]}}}
 `
 
-const mcpInstructions = "Things 3 to-do manager on this Mac. Start with read; pass the short ids it prints to the other tools."
+const mcpInstructions = "Things 3 to-do manager on this Mac. Start with read; pass the short ids it prints to the other tools. " +
+	"Every write replies with the item's state read back from Things, so there is no need to read it again."
 
 const readDescription = "Read Things 3. No args: list counts. Filters search open items. " +
 	"Line: <id> <title> [proj N] @start HH:MM eve !deadline #tag [done/total] ~repeat; '<name> <id>:' heads an indented group. Dates MM-DD; header has today=."
@@ -111,9 +112,9 @@ func mcpTools(cfg mcpConfig) []mcp.Tool {
 		return append(tools, cfg.opsTool(), trash, show, helpTool(trashOmit))
 	}
 	return append(tools,
-		cfg.tool("add", "Create a to-do (default), project, area or tag. Dates: YYYY-MM-DD, today, tomorrow, +Nd.",
+		cfg.tool("add", "Create a to-do (default), project, area or tag. Dates: YYYY-MM-DD, today, tomorrow, +Nd. Replies with the new item as Things saved it.",
 			&command.Add{}, nil, annotations(false, false, false)),
-		cfg.tool("update", "Change, move, complete, cancel or reopen an item. Only given fields change.",
+		cfg.tool("update", "Change, move, complete, cancel or reopen an item. Only given fields change. Replies with the item as Things saved it.",
 			&command.Update{}, nil, annotations(false, false, false)),
 		trash,
 		cfg.tool("batch", `Bulk create/update. json: Things URL-scheme JSON array, e.g. [{"type":"to-do","attributes":{"title":"x"}}]`,
