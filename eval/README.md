@@ -32,3 +32,34 @@ The run used Codex CLI 0.169.0 with its default model at medium reasoning effort
 - **The eval found a real bug.** `add` with `in: "Inbox"` was rejected. It is fixed.
 
 **Decision:** keep the six-tool surface as the default. The ops surface stays behind `--surface ops` for further experiments.
+
+## Round trips, 2026-11-19
+
+The first comparison showed that cost follows the number of model requests. The agent made extra requests in two places:
+
+- **A lookup read before the write**, only to turn a title into an id. This happened in 34 of 34 write runs.
+- **A verification read after the write**, in 24 of 36 runs. The receipt usually could not show the change, for example a move to Someday, a new project or appended notes.
+
+Three changes went in as separate commits and were measured cumulatively with `EVAL_VARIANTS`. The run used the same agent setup, all 24 tasks × 2 repetitions, and the tools surface:
+
+- **base** (`ad21d15`): before the changes.
+- **receipts** (`737cc9f`): a write receipt says where the item lives (`inbox`, `anytime`, `someday`, `@today`) and its parent (`in:"Kitchen renovation"`). It marks `no-deadline` and repeats changed notes and checklists.
+- **trust** (`0598472`): the tool descriptions and server instructions say that the reply is the state read back from Things.
+- **titles** (`8798df5`): `update`, `trash`, `show` and `read id` accept an exact title. Matching is case-insensitive and Unicode-aware, open items win over closed ones, and an ambiguous title is an error that lists the candidate ids.
+
+Write tasks, excluding trash (34 runs per variant):
+
+| variant | success | mean input tokens | effective tokens¹ | tool calls | runs that read first | mean seconds |
+|---|---|---|---|---|---|---|
+| base | 34/34 | 114.4k | 23.8k | 3.09 | 34 | 17.7 |
+| receipts | 34/34 | 106.8k | 21.7k | 2.62 | 34 | 18.7 |
+| trust | 34/34 | 99.9k | 24.0k | 2.26 | 33 | 17.2 |
+| titles | 34/34 | **81.4k** | **20.0k** | **1.47** | 4 | **15.7** |
+
+¹ Effective tokens = uncached input + 10% of cached input + 4 × output, which approximates the price with prompt caching.
+
+- **Single-item writes now take one call.** That is two model requests, about 72–77k input tokens, which is the floor for this client. Before the changes they took 113k.
+- **Each change helped.** Receipts and trust removed most verification reads, and titles removed the lookup read.
+- **Read tasks and success rates did not change.** Every variant scored 46/48; trash is still blocked by Codex itself.
+- **The money saving is smaller than the token count suggests.** Total input fell by 29%, but most of the saved tokens were cached, so the effective cost fell by about 16% and the time by 11%. Uncached input is dominated by Codex's own first request and is noisy from run to run.
+- **Multi-item tasks still need a read.** "Mark everything tagged errand as done" must list the items first, and the agent sometimes reads the list again at the end.

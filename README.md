@@ -31,6 +31,7 @@ thingsctl add "Buy milk" --when tomorrow --tags home    # prints: ok <id> Buy mi
 thingsctl add "Pack" --in Trip --checklist "socks; charger"
 thingsctl add "Q4 plan" --type project --in Work --items "draft; review"
 thingsctl update a3f9 --status done                     # also: canceled, open
+thingsctl update "Buy milk" --when someday              # an exact title works as an id
 thingsctl update a3f9 --when evening --notes "call first" --notes-mode append
 thingsctl update a3f9 --tags urgent --tags-mode add     # tag modes: set, add, remove
 thingsctl trash a3f9                                    # moves to the Trash
@@ -38,7 +39,7 @@ thingsctl show today                                    # opens the list in Thin
 thingsctl batch - < items.json                          # Things JSON, for bulk changes
 ```
 
-thingsctl confirms every write by reading the database back. If Things has not recorded the change within 1.5 s, it reports `sent … unconfirmed` instead of `ok`. Add `--dry-run` to see the exact AppleScript or URL without changing anything. Set `THINGSCTL_READONLY=1` to turn off writing entirely.
+Items can be named by id or by exact title. An ambiguous title is an error that lists the matching ids. thingsctl confirms every write by reading the database back. If Things has not recorded the change within 1.5 s, it reports `sent … unconfirmed` instead of `ok`. The `ok` line shows the item as Things saved it, including its list and parent, for example `ok a3f9 Buy milk someday in:"Home"`, so agents do not need to read it again. Add `--dry-run` to see the exact AppleScript or URL without changing anything. Set `THINGSCTL_READONLY=1` to turn off writing entirely.
 
 How thingsctl sends writes to Things:
 
