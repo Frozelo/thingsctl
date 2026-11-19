@@ -1,10 +1,10 @@
 # thingsctl
 
-A command-line tool, and later an MCP server, that lets AI agents work with [Things 3](https://culturedcode.com/things/) on macOS. It is designed to cost agents as few tokens as possible and to use as little CPU and memory as possible.
+A command-line tool and MCP server that lets AI agents work with [Things 3](https://culturedcode.com/things/) on macOS. It is designed to cost agents as few tokens as possible and to use as little CPU and memory as possible.
 
 > **Unofficial.** thingsctl is not affiliated with or endorsed by Cultured Code. "Things" is a trademark of Cultured Code GmbH & Co. KG.
 
-**Status: early development.** Reading and writing are done. The MCP server is in progress.
+**Status: early development.** Reading, writing and the MCP server work; there are no releases yet.
 
 ## Design
 
@@ -57,6 +57,37 @@ Work b2c4:
 evening:
  d0e1 Call mom @18:00
 ```
+
+## MCP server
+
+`thingsctl mcp` runs an MCP server on stdio with six tools: `read`, `add`, `update`, `trash`, `batch` and `show`. They take the same arguments as the CLI verbs, with `-` in flag names written as `_` (`notes_mode`). The whole tool list is about 3 KB of JSON, and tool results use the same compact text as the CLI.
+
+Claude Code:
+
+```sh
+claude mcp add things -- thingsctl mcp
+```
+
+Codex (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.things]
+command = "thingsctl"
+args = ["mcp"]
+```
+
+Cursor, Claude Desktop and other clients:
+
+```json
+{"mcpServers": {"things": {"command": "/full/path/to/thingsctl", "args": ["mcp"]}}}
+```
+
+Server flags:
+
+- `--read-only` exposes only the `read` tool. `THINGSCTL_READONLY=1` does the same.
+- `--allow-permanent` lets `trash` empty the Trash and delete areas and tags. Without it, the agent can only move to-dos and projects to the Trash.
+
+The server is a process of the client app, so that app needs Full Disk Access to read the Things database.
 
 ## Install
 

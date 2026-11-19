@@ -47,6 +47,7 @@ usage:
   thingsctl trash <id>            move to Trash (areas/tags: --confirm; --empty --confirm)
   thingsctl show <id|list>        open in the Things window
   thingsctl batch <json|->        send a Things JSON array (bulk create/update)
+  thingsctl mcp [flags]           run as an MCP server on stdio (see: thingsctl mcp -h)
   thingsctl <verb> -h             flags of a verb; thingsctl read help: output format
   thingsctl version
 
@@ -90,6 +91,8 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		err = runWrite("batch", "send a Things JSON array to the json command", &b, args[1:], stdout, func(e *write.Env) error {
 			return e.Batch(context.Background(), b, Stdin)
 		})
+	case "mcp":
+		err = runMCP(args[1:], Stdin, stdout)
 	case "version", "--version":
 		fmt.Fprintln(stdout, "thingsctl", Version)
 	case "help", "-h", "--help":
@@ -114,6 +117,11 @@ func runWrite(verb, summary string, v any, args []string, w io.Writer, run func(
 		}
 		return err
 	}
+	return withEnv(w, run)
+}
+
+// withEnv opens the database and runs a write with a fresh write.Env.
+func withEnv(w io.Writer, run func(*write.Env) error) error {
 	db, err := OpenDB()
 	if err != nil {
 		return err
@@ -143,6 +151,11 @@ func runRead(args []string, w io.Writer) error {
 		}
 		return err
 	}
+	return execRead(r, w)
+}
+
+// execRead runs a parsed read.
+func execRead(r command.Read, w io.Writer) error {
 	if r.View == "help" {
 		command.Usage(w, "read", readSummary, &r)
 		fmt.Fprint(w, legend)
