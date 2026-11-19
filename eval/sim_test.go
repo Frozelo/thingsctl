@@ -63,7 +63,7 @@ func TestSimRoundTrip(t *testing.T) {
 			t.Errorf("call %d: %q missing %q", i, texts[i], w)
 		}
 	}
-	if !strings.HasSuffix(texts[9], "inbox now matches 0 to-dos") {
+	if !strings.HasSuffix(texts[9], "\nupdated 3 of 3; inbox now matches 0 to-dos") {
 		t.Errorf("bulk update: %q", texts[9])
 	}
 	if strings.Contains(texts[6], "Pay electricity bill") {

@@ -341,7 +341,7 @@ func TestUpdateWhere(t *testing.T) {
 	if len(fk.scripts) != 2 {
 		t.Fatalf("want one script per to-do, got %d", len(fk.scripts))
 	}
-	for _, want := range []string{"ok Ttod Draft report", "ok Tany Anytime under heading", "project:Work now matches 0 to-dos"} {
+	for _, want := range []string{"ok Ttod Draft report", "ok Tany Anytime under heading", "\nupdated 2 of 2; project:Work now matches 0 to-dos\n"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("output missing %q:\n%s", want, out)
 		}

@@ -74,8 +74,10 @@ func (s *Sim) Apply(ctx context.Context, v any, w io.Writer) error {
 		out = strings.Replace(out, "\x01"+id, s.line(ctx, id, write.EchoFor(v)), 1)
 	}
 	if u, ok := v.(*command.Update); ok && u.Where != "" {
+		n := len(st.lines)
+		out += fmt.Sprintf("\nupdated %d of %d", n, n)
 		if ids, err := selectWhere(s.Path, u.Where); err == nil {
-			out += fmt.Sprintf("\n%s now matches %d to-dos", u.Where, len(ids))
+			out += fmt.Sprintf("; %s now matches %d to-dos", u.Where, len(ids))
 		}
 	}
 	fmt.Fprint(w, out)

@@ -607,9 +607,11 @@ func (e *Env) updateWhere(ctx context.Context, u command.Update) error {
 	if u.DryRun {
 		return nil
 	}
+	summary := fmt.Sprintf("updated %d of %d", len(tasks)-failed, len(tasks))
 	if after, _, err := e.selectWhere(ctx, u.Where); err == nil {
-		fmt.Fprintf(e.Out, "%s now matches %d to-dos\n", u.Where, len(after))
+		summary += fmt.Sprintf("; %s now matches %d to-dos", u.Where, len(after))
 	}
+	fmt.Fprintln(e.Out, summary)
 	if failed > 0 {
 		return fmt.Errorf("%d of %d to-dos failed", failed, len(tasks))
 	}
