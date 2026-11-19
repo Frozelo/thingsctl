@@ -27,7 +27,7 @@ import (
 // Read lists a view, searches, or shows one item.
 type Read struct {
 	View     string `arg:"view" enum:"summary|inbox|today|upcoming|anytime|someday|deadlines|logbook|trash|projects|areas|tags|help" mcp:"~" help:"list to show (default summary; search when -q is set)"`
-	ID       string `flag:"id" mcp:"one item in full" help:"show one item in full: to-do, project, area, tag (short or full id)"`
+	ID       string `flag:"id" mcp:"one item in full: id or exact title" help:"show one item in full: to-do, project, area, tag (id or exact title)"`
 	Q        string `flag:"q" mcp:"search text" help:"search titles and notes (case-insensitive)"`
 	Tag      string `flag:"tag" mcp:"~" help:"only items with this tag"`
 	Project  string `flag:"project" mcp:"~" help:"only items in this project (id or exact title)"`
@@ -56,7 +56,7 @@ type Add struct {
 
 // Update changes an existing item. Only the given fields change.
 type Update struct {
-	ID            string `arg:"id" required:"true" mcp:"~" help:"item to change (short or full id; required)"`
+	ID            string `arg:"id" required:"true" mcp:"id or exact title" help:"item to change: id or exact title (required)"`
 	Title         string `flag:"title" mcp:"~" help:"new title"`
 	Notes         string `flag:"notes" mcp:"~" help:"notes text (see --notes-mode)"`
 	NotesMode     string `flag:"notes-mode" enum:"set|append|prepend" mcp:"~" help:"how --notes applies (default set)"`
@@ -74,7 +74,7 @@ type Update struct {
 
 // Trash moves a to-do or project to the Trash, or deletes an area or tag.
 type Trash struct {
-	ID      string `arg:"id" mcp:"~" help:"to-do or project to move to the Trash; areas and tags are deleted permanently"`
+	ID      string `arg:"id" mcp:"id or exact title" help:"to-do or project (id or exact title) to move to the Trash; areas and tags are deleted permanently"`
 	Empty   bool   `flag:"empty" mcp:"empty the Trash" help:"empty the Trash (permanent)"`
 	Confirm bool   `flag:"confirm" mcp:"~" help:"required for permanent deletes: --empty, areas, tags"`
 	DryRun  bool   `flag:"dry-run" mcp:"-" help:"print what would be sent to Things and change nothing"`
@@ -82,7 +82,7 @@ type Trash struct {
 
 // Show opens an item or list in the Things window.
 type Show struct {
-	Target string `arg:"target" required:"true" mcp:"id or list name" help:"id, or a list: inbox today upcoming anytime someday logbook trash"`
+	Target string `arg:"target" required:"true" mcp:"id, exact title or list name" help:"id, exact title, or a list: inbox today upcoming anytime someday logbook trash"`
 }
 
 // Batch passes a Things JSON array straight to the Things json command.

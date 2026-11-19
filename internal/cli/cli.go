@@ -433,7 +433,7 @@ func tags(w io.Writer, snap *thingsdb.Snap, c render.Ctx) error {
 }
 
 func showOne(w io.Writer, snap *thingsdb.Snap, c render.Ctx, ref string) error {
-	id, err := c.IDs.Resolve(ref)
+	id, err := snap.ResolveItem(c.IDs, ref)
 	if err != nil {
 		return err
 	}

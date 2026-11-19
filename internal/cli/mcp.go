@@ -27,7 +27,7 @@ example client config:
   {"mcpServers":{"things":{"command":"thingsctl","args":["mcp"]}}}
 `
 
-const mcpInstructions = "Things 3 to-do manager on this Mac. Start with read; pass the short ids it prints to the other tools. " +
+const mcpInstructions = "Things 3 to-do manager on this Mac. Name items by short id or exact title; when the user gives a title, act on it directly without reading first. " +
 	"Every write replies with the item's state read back from Things, so there is no need to read it again."
 
 const readDescription = "Read Things 3. No args: list counts. Filters search open items. " +

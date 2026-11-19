@@ -41,7 +41,7 @@ func (s *Sim) Apply(ctx context.Context, v any, w io.Writer) error {
 		return err
 	}
 	defer tx.Rollback()
-	st := &simTx{tx: tx, today: thingsdb.DateOf(time.Now()), now: float64(time.Now().Unix())}
+	st := &simTx{tx: tx, path: s.Path, today: thingsdb.DateOf(time.Now()), now: float64(time.Now().Unix())}
 	var receipt func() string
 	switch c := v.(type) {
 	case *command.Add:
@@ -88,6 +88,7 @@ func (s *Sim) line(ctx context.Context, id string, echo write.Echo) string {
 
 type simTx struct {
 	tx    *sql.Tx
+	path  string
 	today thingsdb.Date
 	now   float64
 	err   error
@@ -143,6 +144,16 @@ func (s *simTx) resolve(ref string) string {
 	all := s.strings(`SELECT uuid FROM TMTask UNION ALL SELECT uuid FROM TMArea UNION ALL SELECT uuid FROM TMTag`)
 	if id, err := shortid.New(all).Resolve(strings.TrimSpace(ref)); err == nil {
 		return id
+	}
+	// Titles: the same resolver as the write path, on the committed state.
+	if db, err := thingsdb.Open(s.path); err == nil {
+		defer db.Close()
+		if snap, err := db.Snap(context.Background()); err == nil {
+			defer snap.Close()
+			if id, err := snap.ResolveItem(shortid.New(all), ref); err == nil {
+				return id
+			}
+		}
 	}
 	return ref
 }

@@ -570,7 +570,7 @@ func (e *Env) Update(ctx context.Context, u command.Update) error {
 	}
 	e.echo = EchoFor(&u)
 	p, err := e.world(ctx, func(w *world) (plan, error) {
-		id, err := w.ids.Resolve(u.ID)
+		id, err := w.snap.ResolveItem(w.ids, u.ID)
 		if err != nil {
 			return plan{}, err
 		}
@@ -903,7 +903,7 @@ func (e *Env) Trash(ctx context.Context, t command.Trash) error {
 		return errors.New("id is required: thingsctl trash <id> (or --empty --confirm)")
 	}
 	p, err := e.world(ctx, func(w *world) (plan, error) {
-		id, err := w.ids.Resolve(t.ID)
+		id, err := w.snap.ResolveItem(w.ids, t.ID)
 		if err != nil {
 			return plan{}, err
 		}
@@ -988,11 +988,11 @@ func (e *Env) Show(ctx context.Context, sh command.Show) error {
 			return err
 		}
 		all, err := s.AllIDs()
+		if err == nil {
+			id, err = s.ResolveItem(shortid.New(all), target)
+		}
 		s.Close()
 		if err != nil {
-			return err
-		}
-		if id, err = shortid.New(all).Resolve(target); err != nil {
 			return err
 		}
 	}

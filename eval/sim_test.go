@@ -24,7 +24,7 @@ func TestSimRoundTrip(t *testing.T) {
 	calls := []string{
 		`{"name":"add","arguments":{"title":"Order tiles","in":"Kitchen renovation","deadline":"+5d","checklist":"a; b"}}`,
 		`{"name":"update","arguments":{"id":"Trec","tags":"waiting","tags_mode":"add"}}`,
-		`{"name":"update","arguments":{"id":"Tele","status":"done"}}`,
+		`{"name":"update","arguments":{"id":"pay electricity bill","status":"done"}}`,
 		`{"name":"batch","arguments":{"json":"[{\"type\":\"to-do\",\"attributes\":{\"title\":\"Water plants\",\"when\":\"evening\"}}]"}}`,
 		`{"name":"trash","arguments":{"id":"Tjug"}}`,
 		`{"name":"read","arguments":{"project":"Kitchen renovation"}}`,
