@@ -7,13 +7,17 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/Frozelo/thingsctl/internal/command"
 	"github.com/Frozelo/thingsctl/internal/render"
 	"github.com/Frozelo/thingsctl/internal/shortid"
+	"github.com/Frozelo/thingsctl/internal/thingsapp"
 	"github.com/Frozelo/thingsctl/internal/thingsdb"
+	"github.com/Frozelo/thingsctl/internal/when"
+	"github.com/Frozelo/thingsctl/internal/write"
 )
 
 // Version is set at build time via -ldflags "-X .../internal/cli.Version=...".
@@ -25,12 +29,28 @@ var Now = time.Now
 // OpenDB opens the Things database; tests override it.
 var OpenDB = thingsdb.OpenDefault
 
+// Runner talks to the Things app; tests override it.
+var Runner thingsapp.Runner = thingsapp.System{}
+
+// Stdin feeds `batch -`; tests override it.
+var Stdin io.Reader = os.Stdin
+
+// ConfirmBudget is how long writes wait for Things to record a change.
+var ConfirmBudget = 1500 * time.Millisecond
+
 const usageText = `thingsctl — token-lean CLI for Things 3 (unofficial)
 
 usage:
   thingsctl read [view] [flags]   read lists, search, or one item (--id)
-  thingsctl read help             output format and all read flags
+  thingsctl add <title> [flags]   create a to-do, project, area or tag
+  thingsctl update <id> [flags]   change fields, move, complete, cancel, reopen
+  thingsctl trash <id>            move to Trash (areas/tags: --confirm; --empty --confirm)
+  thingsctl show <id|list>        open in the Things window
+  thingsctl batch <json|->        send a Things JSON array (bulk create/update)
+  thingsctl <verb> -h             flags of a verb; thingsctl read help: output format
   thingsctl version
+
+set THINGSCTL_READONLY=1 to disable all writes.
 
 views: summary inbox today upcoming anytime someday deadlines logbook trash projects areas tags
 `
@@ -45,6 +65,31 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	switch args[0] {
 	case "read":
 		err = runRead(args[1:], stdout)
+	case "add":
+		var a command.Add
+		err = runWrite("add", "create a to-do, project, area or tag", &a, args[1:], stdout, func(e *write.Env) error {
+			return e.Add(context.Background(), a)
+		})
+	case "update":
+		var u command.Update
+		err = runWrite("update", "change an item; only given fields change", &u, args[1:], stdout, func(e *write.Env) error {
+			return e.Update(context.Background(), u)
+		})
+	case "trash":
+		var t command.Trash
+		err = runWrite("trash", "move to Trash, delete an area/tag, or empty the Trash", &t, args[1:], stdout, func(e *write.Env) error {
+			return e.Trash(context.Background(), t)
+		})
+	case "show":
+		var sh command.Show
+		err = runWrite("show", "open an item or list in Things", &sh, args[1:], stdout, func(e *write.Env) error {
+			return e.Show(context.Background(), sh)
+		})
+	case "batch":
+		var b command.Batch
+		err = runWrite("batch", "send a Things JSON array to the json command", &b, args[1:], stdout, func(e *write.Env) error {
+			return e.Batch(context.Background(), b, Stdin)
+		})
 	case "version", "--version":
 		fmt.Fprintln(stdout, "thingsctl", Version)
 	case "help", "-h", "--help":
@@ -58,6 +103,25 @@ func Main(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	return 0
+}
+
+// runWrite parses a write verb and runs it with a write.Env.
+func runWrite(verb, summary string, v any, args []string, w io.Writer, run func(*write.Env) error) error {
+	if err := command.Parse(verb, v, args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			command.Usage(w, verb, summary, v)
+			return nil
+		}
+		return err
+	}
+	db, err := OpenDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	db.Now = Now
+	return run(&write.Env{DB: db, Runner: Runner, Out: w, Budget: ConfirmBudget,
+		ReadOnly: os.Getenv("THINGSCTL_READONLY") == "1"})
 }
 
 const readSummary = "read lists, search, or show one item"
@@ -257,7 +321,7 @@ func filter(r command.Read, c render.Ctx, snap *thingsdb.Snap) (func(thingsdb.Ta
 		})
 	}
 	if r.Modified != "" {
-		d, err := parseDay(r.Modified, c.Today)
+		d, err := when.Day(r.Modified, c.Today)
 		if err != nil {
 			return nil, err
 		}
@@ -280,30 +344,6 @@ func resolveQuiet(c render.Ctx, s string) string {
 		return ""
 	}
 	return id
-}
-
-// parseDay accepts YYYY-MM-DD, today, yesterday, tomorrow, +Nd, -Nd.
-func parseDay(s string, today thingsdb.Date) (thingsdb.Date, error) {
-	switch s {
-	case "today":
-		return today, nil
-	case "yesterday":
-		return today.AddDays(-1), nil
-	case "tomorrow":
-		return today.AddDays(1), nil
-	}
-	if len(s) > 2 && (s[0] == '+' || s[0] == '-') && s[len(s)-1] == 'd' {
-		if n, ok := command.Atoi(s[1 : len(s)-1]); ok {
-			if s[0] == '-' {
-				n = -n
-			}
-			return today.AddDays(n), nil
-		}
-	}
-	if t, err := time.Parse("2006-01-02", s); err == nil {
-		return thingsdb.DateOf(t), nil
-	}
-	return 0, fmt.Errorf("invalid date %q; valid: YYYY-MM-DD, today, yesterday, tomorrow, +Nd, -Nd", s)
 }
 
 func summary(w io.Writer, snap *thingsdb.Snap, c render.Ctx) error {

@@ -404,3 +404,25 @@ func (s *Snap) ChecklistOwner(itemID string) (string, error) {
 	}
 	return task, err
 }
+
+// Token returns the Things URL-scheme auth token ("" when Things URLs are off).
+func (s *Snap) Token() (string, error) {
+	var tok string
+	err := s.tx.QueryRowContext(s.ctx, `SELECT coalesce(uriSchemeAuthenticationToken,'') FROM TMSettings LIMIT 1`).Scan(&tok)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return tok, err
+}
+
+// CreatedSince returns items of any state created at or after t, oldest first.
+func (s *Snap) CreatedSince(t time.Time) ([]Task, error) {
+	return s.queryTasks(` t.creationDate >= ? ORDER BY t.creationDate`, float64(t.UnixNano())/1e9)
+}
+
+// TrashCount returns the number of items in the Trash.
+func (s *Snap) TrashCount() (int, error) {
+	var n int
+	err := s.tx.QueryRowContext(s.ctx, `SELECT count(*) FROM TMTask WHERE trashed=1`).Scan(&n)
+	return n, err
+}

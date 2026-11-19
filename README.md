@@ -4,7 +4,7 @@ A command-line tool, and later an MCP server, that lets AI agents work with [Thi
 
 > **Unofficial.** thingsctl is not affiliated with or endorsed by Cultured Code. "Things" is a trademark of Cultured Code GmbH & Co. KG.
 
-**Status: early development.** Reading works. Writing and the MCP server are in progress.
+**Status: early development.** Reading and writing are done. The MCP server is in progress.
 
 ## Design
 
@@ -24,7 +24,30 @@ thingsctl read --id a3f9       # one item in full: notes, checklist, dates
 thingsctl read help            # output format and every flag
 ```
 
-Example output:
+Writing:
+
+```sh
+thingsctl add "Buy milk" --when tomorrow --tags home    # prints: ok <id> Buy milk @11-20 #home
+thingsctl add "Pack" --in Trip --checklist "socks; charger"
+thingsctl add "Q4 plan" --type project --in Work --items "draft; review"
+thingsctl update a3f9 --status done                     # also: canceled, open
+thingsctl update a3f9 --when evening --notes "call first" --notes-mode append
+thingsctl update a3f9 --tags urgent --tags-mode add     # tag modes: set, add, remove
+thingsctl trash a3f9                                    # moves to the Trash
+thingsctl show today                                    # opens the list in Things
+thingsctl batch - < items.json                          # Things JSON, for bulk changes
+```
+
+thingsctl confirms every write by reading the database back. If Things has not recorded the change within 1.5 s, it reports `sent … unconfirmed` instead of `ok`. Add `--dry-run` to see the exact AppleScript or URL without changing anything. Set `THINGSCTL_READONLY=1` to turn off writing entirely.
+
+How thingsctl sends writes to Things:
+
+- **AppleScript** is the default. It needs no token, it does not bring Things to the front, and it returns the new item's id. User text is passed to the script as arguments and is never inserted into the script source.
+- **The Things URL scheme** is used only for what AppleScript cannot do: evening, reminders (`--when today@18:00`), headings, checklists and `batch`. Editing an existing item this way needs Things → Settings → General → Enable Things URLs.
+- **Things itself blocks some edits.** You cannot change the when date or deadline of a repeating to-do, and repeating templates are read-only. Headings can only be created with `add --heading`. Checklist items are replaced as a whole list.
+- **Permanent deletes ask for `--confirm`.** This applies to `trash --empty` and to deleting areas and tags.
+
+Example read output:
 
 ```
 today=11-19 today:3
