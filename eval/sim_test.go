@@ -31,6 +31,7 @@ func TestSimRoundTrip(t *testing.T) {
 		`{"name":"read","arguments":{"view":"today"}}`,
 		`{"name":"read","arguments":{"tag":"waiting"}}`,
 		`{"name":"read","arguments":{"view":"trash"}}`,
+		`{"name":"update","arguments":{"where":"inbox","when":"anytime"}}`,
 	}
 	var in strings.Builder
 	in.WriteString(`{"jsonrpc":"2.0","id":0,"method":"initialize","params":{}}` + "\n")
@@ -56,11 +57,14 @@ func TestSimRoundTrip(t *testing.T) {
 		texts = append(texts, m.Result.Content[0].Text)
 		t.Logf("%s\n", m.Result.Content[0].Text)
 	}
-	want := []string{"Order tiles", "#home #waiting", "done:", "new rows seen: 1", "Learn to juggle", "Order tiles", "Water plants", "Collect receipts", "Learn to juggle"}
+	want := []string{"Order tiles", "#home #waiting", "done:", "new rows seen: 1", "Learn to juggle", "Order tiles", "Water plants", "Collect receipts", "Learn to juggle", "Call plumber anytime\nok "}
 	for i, w := range want {
 		if !strings.Contains(texts[i], w) {
 			t.Errorf("call %d: %q missing %q", i, texts[i], w)
 		}
+	}
+	if !strings.HasSuffix(texts[9], "inbox now matches 0 to-dos") {
+		t.Errorf("bulk update: %q", texts[9])
 	}
 	if strings.Contains(texts[6], "Pay electricity bill") {
 		t.Error("completed item still in Today")

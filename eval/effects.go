@@ -54,6 +54,7 @@ type norm struct {
 	ids        *shortid.Index
 	titles     map[string]string // lower task title -> uuid (unique titles only)
 	containers map[string]string // lower title -> uuid
+	seed       string            // seed database path, for expanding where
 	today      thingsdb.Date
 }
 
@@ -181,12 +182,23 @@ func failed(c Call) bool {
 // Effects converts recorded calls into successful write effects.
 func (n norm) Effects(calls []Call) (adds []Effect, updates map[string]Effect, trashes []string, writes int) {
 	updates = map[string]Effect{}
-	addUpdate := func(e Effect) {
+	addUpdate0 := func(e Effect) {
 		prev, ok := updates[e.ID]
 		if ok {
 			e = merge(prev, e)
 		}
 		updates[e.ID] = e
+	}
+	addUpdate := func(e Effect, where string) {
+		if where == "" {
+			addUpdate0(e)
+			return
+		}
+		ids, _ := selectWhere(n.seed, where)
+		for _, id := range ids {
+			e.ID = id
+			addUpdate0(e)
+		}
 	}
 	for _, c := range calls {
 		switch c.Tool {
@@ -202,7 +214,7 @@ func (n norm) Effects(calls []Call) (adds []Effect, updates map[string]Effect, t
 		case "update":
 			var u command.Update
 			if !failed(c) && command.FromMap(&u, c.Args) == nil {
-				addUpdate(n.fromUpdate(u))
+				addUpdate(n.fromUpdate(u), u.Where)
 			}
 		case "trash":
 			var t command.Trash
@@ -232,7 +244,7 @@ func (n norm) Effects(calls []Call) (adds []Effect, updates map[string]Effect, t
 				case "update":
 					var u command.Update
 					if command.FromMap(&u, fields) == nil {
-						addUpdate(n.fromUpdate(u))
+						addUpdate(n.fromUpdate(u), u.Where)
 					}
 				}
 			}
@@ -248,7 +260,7 @@ func (n norm) Effects(calls []Call) (adds []Effect, updates map[string]Effect, t
 			a, u := n.fromThingsJSON(raw)
 			adds = append(adds, a...)
 			for _, e := range u {
-				addUpdate(e)
+				addUpdate(e, "")
 			}
 		}
 	}

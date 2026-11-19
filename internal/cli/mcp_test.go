@@ -111,7 +111,7 @@ func TestMCPWritesReachRunner(t *testing.T) {
 	if !res[2].IsError || !strings.Contains(res[2].Text, "JSON array itself") {
 		t.Errorf("batch stdin: %+v", res[2])
 	}
-	if !res[3].IsError || !strings.Contains(res[3].Text, `missing required argument "id"`) {
+	if !res[3].IsError || !strings.Contains(res[3].Text, "id (an id or exact title) or where is required") {
 		t.Errorf("update without id: %+v", res[3])
 	}
 }
@@ -161,9 +161,9 @@ func TestMCPOpsSurface(t *testing.T) {
 	if res[0].IsError || res[0].Text != "ok (dry run)\nok (dry run)" {
 		t.Errorf("two ops: %+v", res[0])
 	}
-	wantLines(t, res[1].Text, "op 2: error: op must be", `op 3: error: missing required argument "id"`, "2 of 3 ops failed")
+	wantLines(t, res[1].Text, "op 2: error: op must be", "op 3: error: id (an id or exact title) or where is required", "2 of 3 ops failed")
 	if !res[1].IsError {
 		t.Error("failed ops must set isError")
 	}
-	wantLines(t, res[2].Text, "id*: item to change", "notes_mode: how notes applies (default set) [set|append|prepend]")
+	wantLines(t, res[2].Text, "id: item to change: id or exact title", "notes_mode: how notes applies (default set) [set|append|prepend]")
 }

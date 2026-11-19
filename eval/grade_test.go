@@ -26,7 +26,7 @@ func testNorm(t *testing.T) (norm, map[string]Task) {
 	for _, tk := range Tasks(today) {
 		tasks[tk.Name] = tk
 	}
-	return norm{ids: shortid.New(ids), today: today, containers: map[string]string{"home": AreaHome, "kitchen renovation": ProjKitchen}}, tasks
+	return norm{ids: shortid.New(ids), today: today, seed: seed, containers: map[string]string{"home": AreaHome, "kitchen renovation": ProjKitchen}}, tasks
 }
 
 func TestGrader(t *testing.T) {
@@ -58,6 +58,9 @@ func TestGrader(t *testing.T) {
 		{"tag_add", []Call{{Tool: "update", Args: map[string]any{"id": "Trec", "tags": "home, waiting"}, Text: ok}}, true},
 		{"reminder", []Call{{Tool: "update", Args: map[string]any{"id": "Tden", "when": "2026-11-24@10:00"}, Text: ok}}, true},
 		{"tag_done", []Call{{Tool: "update", Args: map[string]any{"id": "Tmon", "status": "done"}, Text: ok}}, false},
+		{"tag_done", []Call{{Tool: "update", Args: map[string]any{"where": "tag:errand", "status": "done"}, Text: ok}}, true},
+		{"inbox_anytime", []Call{{Tool: "update", Args: map[string]any{"where": "inbox", "when": "anytime"}, Text: ok}}, true},
+		{"inbox_anytime", []Call{{Tool: "update", Args: map[string]any{"where": "inbox", "when": "someday"}, Text: ok}}, false},
 		{"trash", []Call{{Tool: "trash", Args: map[string]any{"id": "Tjug"}, Text: ok}}, true},
 		{"new_project", []Call{{Tool: "add", Args: map[string]any{"title": "Garden", "type": "project", "in": "Home", "items": "Buy seeds; Build raised bed"}, Text: ok}}, true},
 	}

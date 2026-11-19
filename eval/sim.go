@@ -73,6 +73,11 @@ func (s *Sim) Apply(ctx context.Context, v any, w io.Writer) error {
 	for _, id := range st.lines {
 		out = strings.Replace(out, "\x01"+id, s.line(ctx, id, write.EchoFor(v)), 1)
 	}
+	if u, ok := v.(*command.Update); ok && u.Where != "" {
+		if ids, err := selectWhere(s.Path, u.Where); err == nil {
+			out += fmt.Sprintf("\n%s now matches %d to-dos", u.Where, len(ids))
+		}
+	}
 	fmt.Fprint(w, out)
 	return nil
 }
@@ -331,7 +336,44 @@ func (s *simTx) add(a command.Add) (func() string, error) {
 	return func() string { return "ok \x01" + id }, nil
 }
 
+// selectWhere expands a --where selector on the committed state.
+func selectWhere(path, where string) ([]string, error) {
+	db, err := thingsdb.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
+	snap, err := db.Snap(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	defer snap.Close()
+	all, _ := snap.AllIDs()
+	tasks, err := snap.Select(shortid.New(all), where)
+	var ids []string
+	for _, t := range tasks {
+		ids = append(ids, t.UUID)
+	}
+	return ids, err
+}
+
 func (s *simTx) update(u command.Update) (func() string, error) {
+	if u.Where != "" {
+		ids, err := selectWhere(s.path, u.Where)
+		if err != nil {
+			return nil, err
+		}
+		var parts []string
+		for _, id := range ids {
+			one := u
+			one.ID, one.Where = id, ""
+			if _, err := s.update(one); err != nil {
+				return nil, err
+			}
+			parts = append(parts, "ok \x01"+id)
+		}
+		return func() string { return strings.Join(parts, "\n") }, nil
+	}
 	id := s.resolve(u.ID)
 	if s.one(`SELECT uuid FROM TMArea WHERE uuid=?`, id) != "" {
 		if u.Title != "" {

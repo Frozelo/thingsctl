@@ -59,8 +59,11 @@ func TestSchema(t *testing.T) {
 	if err := json.Unmarshal(raw, &s); err != nil {
 		t.Fatalf("invalid JSON: %v\n%s", err, raw)
 	}
-	if s.Type != "object" || len(s.Required) != 1 || s.Required[0] != "id" {
-		t.Fatalf("got %s", raw)
+	if s.Type != "object" || len(s.Required) != 0 {
+		t.Fatalf("update needs id or where, so nothing is required: %s", raw)
+	}
+	if add := string(Schema(&Add{})); !strings.HasSuffix(add, `"required":["title"]}`) {
+		t.Errorf("add must require title: %s", add)
 	}
 	if _, ok := s.Properties["dry_run"]; ok {
 		t.Error("dry_run must be hidden from MCP")

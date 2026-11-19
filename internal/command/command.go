@@ -56,7 +56,8 @@ type Add struct {
 
 // Update changes an existing item. Only the given fields change.
 type Update struct {
-	ID            string `arg:"id" required:"true" mcp:"id or exact title" help:"item to change: id or exact title (required)"`
+	ID            string `arg:"id" mcp:"id or exact title" help:"item to change: id or exact title (or use --where)"`
+	Where         string `flag:"where" mcp:"instead of id, change every to-do in: inbox|today|upcoming|anytime|someday|deadlines|logbook, tag:X, project:X, area:X or q:text (max 50)" help:"instead of an id, change every to-do in a list (inbox today upcoming anytime someday deadlines logbook) or matching tag:X, project:X, area:X, q:text; at most 50"`
 	Title         string `flag:"title" mcp:"~" help:"new title"`
 	Notes         string `flag:"notes" mcp:"~" help:"notes text (see --notes-mode)"`
 	NotesMode     string `flag:"notes-mode" enum:"set|append|prepend" mcp:"~" help:"how --notes applies (default set)"`

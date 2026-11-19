@@ -563,10 +563,68 @@ func (e *Env) addTag(w *world, a command.Add) (plan, error) {
 
 // ---- update ----------------------------------------------------------------
 
+// MaxBulk caps how many to-dos one --where update may change.
+const MaxBulk = 50
+
+// selectWhere returns the to-dos a --where update applies to, and short ids.
+func (e *Env) selectWhere(ctx context.Context, where string) ([]thingsdb.Task, *shortid.Index, error) {
+	s, err := e.DB.Snap(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer s.Close()
+	all, err := s.AllIDs()
+	if err != nil {
+		return nil, nil, err
+	}
+	ids := shortid.New(all)
+	tasks, err := s.Select(ids, where)
+	return tasks, ids, err
+}
+
+// updateWhere applies one change to every selected to-do, one at a time,
+// then reports how many still match, so the result needs no re-read.
+func (e *Env) updateWhere(ctx context.Context, u command.Update) error {
+	tasks, _, err := e.selectWhere(ctx, u.Where)
+	if err != nil {
+		return err
+	}
+	switch {
+	case len(tasks) == 0:
+		return fmt.Errorf("no to-dos match where %q", u.Where)
+	case len(tasks) > MaxBulk:
+		return fmt.Errorf("where %q matches %d to-dos, more than %d; narrow it or pass ids", u.Where, len(tasks), MaxBulk)
+	}
+	failed := 0
+	for _, t := range tasks {
+		one := u
+		one.ID, one.Where = t.UUID, ""
+		if err := e.Update(ctx, one); err != nil {
+			failed++
+			fmt.Fprintf(e.Out, "error %s: %v\n", t.Title, err)
+		}
+	}
+	if u.DryRun {
+		return nil
+	}
+	if after, _, err := e.selectWhere(ctx, u.Where); err == nil {
+		fmt.Fprintf(e.Out, "%s now matches %d to-dos\n", u.Where, len(after))
+	}
+	if failed > 0 {
+		return fmt.Errorf("%d of %d to-dos failed", failed, len(tasks))
+	}
+	return nil
+}
+
 // Update changes an item.
 func (e *Env) Update(ctx context.Context, u command.Update) error {
-	if u.ID == "" {
-		return errors.New("id is required: thingsctl update <id> [flags]")
+	switch {
+	case u.Where != "" && u.ID != "":
+		return errors.New("pass either id or where, not both")
+	case u.Where != "":
+		return e.updateWhere(ctx, u)
+	case u.ID == "":
+		return errors.New("id (an id or exact title) or where is required")
 	}
 	e.echo = EchoFor(&u)
 	p, err := e.world(ctx, func(w *world) (plan, error) {

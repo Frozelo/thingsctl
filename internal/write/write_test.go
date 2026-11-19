@@ -332,3 +332,30 @@ func TestReceiptShowsWhereAndEchoes(t *testing.T) {
 		}
 	}
 }
+
+func TestUpdateWhere(t *testing.T) {
+	e, fk, out := setup(t)
+	if err := e.Update(ctx, command.Update{Where: "project:Work", Status: "done"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(fk.scripts) != 2 {
+		t.Fatalf("want one script per to-do, got %d", len(fk.scripts))
+	}
+	for _, want := range []string{"ok Ttod Draft report", "ok Tany Anytime under heading", "project:Work now matches 0 to-dos"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output missing %q:\n%s", want, out)
+		}
+	}
+	for _, c := range []struct {
+		u    command.Update
+		want string
+	}{
+		{command.Update{ID: "Ttod", Where: "inbox", Status: "done"}, "either id or where"},
+		{command.Update{Where: "tag:nobody", Status: "done"}, `no to-dos match where "tag:nobody"`},
+		{command.Update{Where: "everywhere", Status: "done"}, "invalid where"},
+	} {
+		if err := e.Update(ctx, c.u); err == nil || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%+v: got %v, want %q", c.u, err, c.want)
+		}
+	}
+}

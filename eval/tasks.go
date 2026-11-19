@@ -65,6 +65,19 @@ func anyOf(s string, forms []string) bool {
 	return false
 }
 
+// addedTag accepts adding tag to an item whose tags are existing.
+func addedTag(tag string, existing ...string) Match {
+	all := append([]string{tag}, existing...)
+	slices.Sort(all)
+	return func(e Effect) bool {
+		if e.Title != "" || e.When != "" || e.Status != "" || e.In != "" || e.Notes != "" {
+			return false
+		}
+		return (e.TagsMode == "add" && slices.Equal(e.Tags, []string{tag})) ||
+			(e.TagsMode != "add" && e.TagsMode != "remove" && slices.Equal(e.Tags, all))
+	}
+}
+
 // Tasks returns the task set for a given today.
 func Tasks(today thingsdb.Date) []Task {
 	iso := func(n int) string { return today.AddDays(n).ISO() }
@@ -155,6 +168,29 @@ func Tasks(today thingsdb.Date) []Task {
 				TPlumber: func(e Effect) bool { return e.When == "anytime" && set(e, "when") },
 				TFlights: func(e Effect) bool { return e.When == "anytime" && set(e, "when") },
 				TArticle: func(e Effect) bool { return e.When == "anytime" && set(e, "when") },
+			}},
+		{Name: "project_done", Prompt: "Mark every to-do in the Taxes 2026 project as done.",
+			Updates: map[string]Match{
+				TReceipts: func(e Effect) bool { return e.Status == "done" && set(e, "status") },
+				TForms:    func(e Effect) bool { return e.Status == "done" && set(e, "status") },
+			}},
+		{Name: "project_tag", Prompt: "Tag every to-do in the Kitchen renovation project with urgent, keeping their existing tags.",
+			Updates: map[string]Match{
+				TPaint:    addedTag("urgent"),
+				TTap:      addedTag("urgent", "home"),
+				TCabinets: addedTag("urgent"),
+			}},
+		{Name: "area_someday", Prompt: "Move all open to-dos in my Health area to Someday.",
+			Updates: map[string]Match{
+				TGym:     func(e Effect) bool { return e.When == "someday" && set(e, "when") },
+				TDentist: func(e Effect) bool { return e.When == "someday" && set(e, "when") },
+			}},
+		{Name: "today_done", Prompt: "Mark everything on my Today list as done.",
+			Updates: map[string]Match{
+				TNotes:    func(e Effect) bool { return e.Status == "done" && set(e, "status") },
+				TElectric: func(e Effect) bool { return e.Status == "done" && set(e, "status") },
+				TReviewPR: func(e Effect) bool { return e.Status == "done" && set(e, "status") },
+				TGym:      func(e Effect) bool { return e.Status == "done" && set(e, "status") },
 			}},
 		{Name: "rename_deadline", Prompt: "Rename the Q4 budget project to 'Q4 budget (final)' and remove its deadline.",
 			Updates: map[string]Match{ProjBudget: func(e Effect) bool {

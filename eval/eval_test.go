@@ -82,7 +82,7 @@ func TestEval(t *testing.T) {
 	snap.Close()
 	db.Close()
 	titles, _ := taskTitles(seed)
-	n := norm{ids: shortid.New(ids), today: today, titles: titles, containers: map[string]string{
+	n := norm{ids: shortid.New(ids), today: today, titles: titles, seed: seed, containers: map[string]string{
 		"home": AreaHome, "work": AreaWork, "health": AreaHealth,
 		"website redesign": ProjWebsite, "q4 budget": ProjBudget, "kitchen renovation": ProjKitchen,
 		"taxes 2026": ProjTaxes, "learn spanish": ProjSpanish,
