@@ -131,3 +131,39 @@ func TestMCPReadOnlyAndPermanent(t *testing.T) {
 		t.Errorf("THINGSCTL_READONLY tools: %v", tools)
 	}
 }
+
+func TestMCPDryRunSendsNothing(t *testing.T) {
+	_, res, rec := mcpSession(t, []string{"--dry-run"},
+		`{"name":"add","arguments":{"title":"Buy milk","when":"tomorrow","tags":"home"}}`,
+		`{"name":"add","arguments":{"title":"x","tags":"nope"}}`,
+		`{"name":"show","arguments":{"target":"today"}}`,
+	)
+	if res[0].IsError || res[0].Text != "ok (dry run)" {
+		t.Errorf("dry-run add: %+v", res[0])
+	}
+	if !res[1].IsError || !strings.Contains(res[1].Text, "nope") {
+		t.Errorf("dry-run must still validate: %+v", res[1])
+	}
+	if res[2].IsError || len(rec.scripts)+len(rec.urls) != 0 {
+		t.Errorf("dry-run reached Things: %+v scripts=%v urls=%v", res[2], rec.scripts, rec.urls)
+	}
+}
+
+func TestMCPOpsSurface(t *testing.T) {
+	tools, res, _ := mcpSession(t, []string{"--surface", "ops", "--dry-run"},
+		`{"name":"write","arguments":{"ops":[{"op":"add","title":"A"},{"op":"update","id":"Ttod","status":"done"}]}}`,
+		`{"name":"write","arguments":{"ops":[{"op":"add","title":"A"},{"op":"remove","id":"x"},{"op":"update","title":"no id"}]}}`,
+		`{"name":"help","arguments":{"topic":"update"}}`,
+	)
+	if strings.Join(tools, ",") != "read,write,trash,show,help" {
+		t.Fatalf("tools: %v", tools)
+	}
+	if res[0].IsError || res[0].Text != "ok (dry run)\nok (dry run)" {
+		t.Errorf("two ops: %+v", res[0])
+	}
+	wantLines(t, res[1].Text, "op 2: error: op must be", `op 3: error: missing required argument "id"`, "2 of 3 ops failed")
+	if !res[1].IsError {
+		t.Error("failed ops must set isError")
+	}
+	wantLines(t, res[2].Text, "id*: item to change", "notes_mode: how notes applies (default set) [set|append|prepend]")
+}

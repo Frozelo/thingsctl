@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -367,4 +368,40 @@ func mustJSON(v any) []byte {
 		panic(err)
 	}
 	return b
+}
+
+// Compact lists a verb's MCP fields as text: name, name(a|b) for enums,
+// name* for required ones.
+func Compact(v any, omit ...string) string {
+	var parts []string
+	for _, f := range MCPFields(v, omit...) {
+		p := f.JSONName()
+		if f.Required {
+			p += "*"
+		}
+		if len(f.Enum) > 0 {
+			p += "(" + strings.Join(f.Enum, "|") + ")"
+		}
+		parts = append(parts, p)
+	}
+	return strings.Join(parts, ", ")
+}
+
+var reFlag = regexp.MustCompile(`--[a-z][a-z-]*`)
+
+// FieldHelp writes one line per MCP field with its full description.
+func FieldHelp(w io.Writer, v any, omit ...string) {
+	for _, f := range MCPFields(v, omit...) {
+		line := f.JSONName()
+		if f.Required {
+			line += "*"
+		}
+		line += ": " + reFlag.ReplaceAllStringFunc(f.Help, func(m string) string {
+			return strings.ReplaceAll(m[2:], "-", "_")
+		})
+		if len(f.Enum) > 0 {
+			line += " [" + strings.Join(f.Enum, "|") + "]"
+		}
+		fmt.Fprintln(w, line)
+	}
 }
