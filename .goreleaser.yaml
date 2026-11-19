@@ -1,0 +1,64 @@
+# Release: push a tag vX.Y.Z; .github/workflows/release.yml runs GoReleaser.
+# Local dry run: go run github.com/goreleaser/goreleaser/v2@latest release --snapshot --clean
+version: 2
+
+project_name: thingsctl
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - main: ./cmd/thingsctl
+    binary: thingsctl
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+    goarch:
+      - arm64
+      - amd64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X github.com/Frozelo/thingsctl/internal/cli.Version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - formats: [tar.gz]
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs"
+      - "^eval"
+
+homebrew_casks:
+  - name: thingsctl
+    binaries:
+      - thingsctl
+    homepage: https://github.com/Frozelo/thingsctl
+    description: Token-lean CLI and MCP server for Things 3 (unofficial)
+    directory: Casks
+    repository:
+      owner: Frozelo
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "thingsctl {{ .Tag }}"
+    # The binary is not signed or notarized; without this macOS refuses to run it.
+    hooks:
+      pre:
+        install_steps: |
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/thingsctl"]

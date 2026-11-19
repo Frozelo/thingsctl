@@ -4,7 +4,7 @@ A command-line tool and MCP server that lets AI agents work with [Things 3](http
 
 > **Unofficial.** thingsctl is not affiliated with or endorsed by Cultured Code. "Things" is a trademark of Cultured Code GmbH & Co. KG.
 
-**Status: early development.** Reading, writing and the MCP server work; there are no releases yet.
+**Status: early development.** Reading, writing and the MCP server work.
 
 ## Design
 
@@ -92,9 +92,19 @@ The server is a process of the client app, so that app needs Full Disk Access to
 
 ## Install
 
+With Homebrew:
+
+```sh
+brew install frozelo/tap/thingsctl
+```
+
+Or with Go:
+
 ```sh
 go install github.com/Frozelo/thingsctl/cmd/thingsctl@latest
 ```
+
+Prebuilt binaries for Apple silicon and Intel Macs are on the [Releases](https://github.com/Frozelo/thingsctl/releases) page. They are not signed or notarized by Apple. The Homebrew cask removes the macOS quarantine flag on install. If you download a binary by hand, run `xattr -d com.apple.quarantine thingsctl` before the first start.
 
 thingsctl needs macOS with Things 3 installed and opened at least once. Check the setup with:
 
