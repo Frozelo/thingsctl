@@ -63,3 +63,26 @@ Write tasks, excluding trash (34 runs per variant):
 - **Read tasks and success rates did not change.** Every variant scored 46/48; trash is still blocked by Codex itself.
 - **The money saving is smaller than the token count suggests.** Total input fell by 29%, but most of the saved tokens were cached, so the effective cost fell by about 16% and the time by 11%. Uncached input is dominated by Codex's own first request and is noisy from run to run.
 - **Multi-item tasks still need a read.** "Mark everything tagged errand as done" must list the items first, and the agent sometimes reads the list again at the end.
+
+## Bulk updates with `where`, 2026-11-19 (preliminary)
+
+After the round-trip fixes, single-item writes were already down to one call. Multi-item tasks still were not, because the agent read the list and then sent one `update` per item. The change in `c7e599f` lets `update --where` replace the id with a selector:
+
+- a list: `inbox`, `today`, `upcoming`, `anytime`, `someday`, `deadlines` or `logbook`;
+- `tag:X`, `project:X`, `area:X` or `q:text`.
+
+One call then changes every matching open to-do: never projects, headings or repeating templates, and at most 50 items. The reply ends with how many still match. The eval gained four multi-item tasks: `project_done`, `project_tag`, `area_someday` and `today_done`.
+
+The run compared `8798df5` (before) with `c7e599f` (where) on 28 tasks × 2 repetitions. It stopped early when the Codex account hit its usage limit, so only 65 of 112 runs finished. The numbers below come from the 31 tasks that finished on both variants. The multi-item group has one run per task, so treat it as an early signal rather than a measurement.
+
+| group | variant | success | mean input | effective tokens | tool calls | seconds |
+|---|---|---|---|---|---|---|
+| multi-item (5 tasks) | before | 5/5 | 104.7k | 18.6k | 4.0 | 25.3 |
+| multi-item (5 tasks) | where | 5/5 | **79.8k** | **16.6k** | **1.2** | **16.6** |
+| other tasks (26 runs) | before | 26/26 | 78.2k | 19.1k | 1.0 | 14.6 |
+| other tasks (26 runs) | where | 26/26 | 75.3k | 17.4k | 1.0 | 14.0 |
+
+- **Four of the five multi-item tasks took one call**, for example `update {where: "today", status: "done"}`. The agent used `where` without being told.
+- **The one exception was `project_tag`, and it shows a gap in the receipt.** Adding a tag does not change which items match, so the closing line "now matches 3 to-dos" does not prove that anything happened, and the agent read the project again. A closing line such as "updated 3 of 3" would cover that case.
+- **The other tasks did not regress.**
+- **Still to do:** a full rerun once the limit resets. `multi_add` and `tag_done` have no data yet.
