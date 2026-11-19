@@ -30,6 +30,24 @@ type Env struct {
 	Out      io.Writer
 	Budget   time.Duration // how long to wait for Things to record a change
 	ReadOnly bool
+
+	echo Echo // what the receipt repeats besides the item line
+}
+
+// Echo marks fields a receipt shows in full because the item line cannot.
+type Echo struct {
+	Notes, Checklist, NoDeadline bool
+}
+
+// EchoFor returns what the receipt of a write command should repeat.
+func EchoFor(cmd any) Echo {
+	switch c := cmd.(type) {
+	case *command.Add:
+		return Echo{Checklist: c.Checklist != ""}
+	case *command.Update:
+		return Echo{Notes: c.Notes != "", Checklist: c.Checklist != "", NoDeadline: c.Deadline == "none"}
+	}
+	return Echo{}
 }
 
 // ErrReadOnly is returned for writes in read-only mode.
@@ -128,8 +146,12 @@ func (e *Env) wait(ctx context.Context, cond func(*thingsdb.Snap) (bool, error))
 }
 
 // line renders a task receipt with fresh short ids.
-func (e *Env) line(ctx context.Context, id string) string {
-	s, err := e.DB.Snap(ctx)
+func (e *Env) line(ctx context.Context, id string) string { return Receipt(ctx, e.DB, id, e.echo) }
+
+// Receipt renders the state of a task after a write, with fresh short ids:
+// its line including where it now lives, plus the fields echo asks for.
+func Receipt(ctx context.Context, db *thingsdb.DB, id string, echo Echo) string {
+	s, err := db.Snap(ctx)
 	if err != nil {
 		return id
 	}
@@ -140,11 +162,31 @@ func (e *Env) line(ctx context.Context, id string) string {
 	if err != nil {
 		return c.IDs.Short(id)
 	}
-	l := c.Line(t, render.LineOpts{When: true, Status: true})
+	l := c.Line(t, render.LineOpts{When: true, Status: true, Where: true, Parent: true})
 	if t.Trashed {
 		l += " trashed"
 	}
+	if echo.NoDeadline && t.Deadline.IsZero() {
+		l += " no-deadline"
+	}
+	if echo.Notes {
+		l += "\nnotes: " + clip(t.Notes, 300)
+	}
+	if echo.Checklist {
+		items := make([]string, len(t.Checklist))
+		for i, it := range t.Checklist {
+			items[i] = it.Title
+		}
+		l += "\nchecklist: " + clip(strings.Join(items, "; "), 300)
+	}
 	return l
+}
+
+func clip(s string, n int) string {
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
 }
 
 func (e *Env) short(ctx context.Context, id string) string {
@@ -229,6 +271,7 @@ func (e *Env) Add(ctx context.Context, a command.Add) error {
 	if strings.TrimSpace(a.Title) == "" {
 		return errors.New("title is required: thingsctl add \"<title>\" [flags]")
 	}
+	e.echo = EchoFor(&a)
 	p, err := e.world(ctx, func(w *world) (plan, error) {
 		switch a.Type {
 		case "", "todo":
@@ -525,6 +568,7 @@ func (e *Env) Update(ctx context.Context, u command.Update) error {
 	if u.ID == "" {
 		return errors.New("id is required: thingsctl update <id> [flags]")
 	}
+	e.echo = EchoFor(&u)
 	p, err := e.world(ctx, func(w *world) (plan, error) {
 		id, err := w.ids.Resolve(u.ID)
 		if err != nil {

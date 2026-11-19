@@ -20,6 +20,7 @@ import (
 	"github.com/Frozelo/thingsctl/internal/shortid"
 	"github.com/Frozelo/thingsctl/internal/thingsdb"
 	"github.com/Frozelo/thingsctl/internal/when"
+	"github.com/Frozelo/thingsctl/internal/write"
 )
 
 // Sim applies validated thingsctl commands straight to a database file, the
@@ -50,7 +51,7 @@ func (s *Sim) Apply(ctx context.Context, v any, w io.Writer) error {
 	case *command.Trash:
 		id := st.resolve(c.ID)
 		st.exec(`UPDATE TMTask SET trashed=1, userModificationDate=? WHERE uuid=?`, st.now, id)
-		receipt = func() string { return "ok " + s.line(ctx, id) }
+		receipt = func() string { return "ok " + s.line(ctx, id, write.Echo{}) }
 	case *command.Show:
 		receipt = func() string { return "ok shown " + c.Target }
 	case *command.Batch:
@@ -70,34 +71,19 @@ func (s *Sim) Apply(ctx context.Context, v any, w io.Writer) error {
 	out := receipt()
 	out = strings.ReplaceAll(out, "\x00", "")
 	for _, id := range st.lines {
-		out = strings.Replace(out, "\x01"+id, s.line(ctx, id), 1)
+		out = strings.Replace(out, "\x01"+id, s.line(ctx, id, write.EchoFor(v)), 1)
 	}
 	fmt.Fprint(w, out)
 	return nil
 }
 
-func (s *Sim) line(ctx context.Context, id string) string {
+func (s *Sim) line(ctx context.Context, id string, echo write.Echo) string {
 	db, err := thingsdb.Open(s.Path)
 	if err != nil {
 		return id
 	}
 	defer db.Close()
-	snap, err := db.Snap(ctx)
-	if err != nil {
-		return id
-	}
-	defer snap.Close()
-	all, _ := snap.AllIDs()
-	c := render.Ctx{Today: snap.Today(), IDs: shortid.New(all)}
-	t, err := snap.Task(id)
-	if err != nil {
-		return c.IDs.Short(id)
-	}
-	l := c.Line(t, render.LineOpts{When: true, Status: true})
-	if t.Trashed {
-		l += " trashed"
-	}
-	return l
+	return write.Receipt(ctx, db, id, echo)
 }
 
 type simTx struct {

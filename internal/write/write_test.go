@@ -319,3 +319,16 @@ func TestAddInInboxMeansNoContainer(t *testing.T) {
 		t.Errorf("inbox add must not target a container:\n%s", src)
 	}
 }
+
+func TestReceiptShowsWhereAndEchoes(t *testing.T) {
+	e, _, out := setup(t)
+	if err := e.Update(ctx, command.Update{ID: f.TodoAny, Notes: "more", NotesMode: "append", Deadline: "none"}); err != nil {
+		t.Fatal(err)
+	}
+	got := out.String()
+	for _, want := range []string{`Tany Anytime under heading anytime #home in:"Work / Phase 1" no-deadline`, "\nnotes: Milk and bread"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("receipt %q missing %q", got, want)
+		}
+	}
+}

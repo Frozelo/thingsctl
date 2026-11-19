@@ -56,6 +56,8 @@ type LineOpts struct {
 	When      bool // show the start date
 	Status    bool // show done/canceled with date
 	InProject bool // project lines inside the projects view: "[N]" instead of "[proj N]"
+	Where     bool // write receipts: name the list of undated open items, "@today" for today
+	Parent    bool // write receipts: in:"<project / heading>" or in:"<area>"
 }
 
 // Line formats one task.
@@ -72,6 +74,11 @@ func (c Ctx) Line(t thingsdb.Task, o LineOpts) string {
 		}
 	}
 	switch {
+	case o.Where && t.StartDate == c.Today && t.Status == thingsdb.StatusOpen:
+		b.WriteString(" @today")
+		if t.HasReminder {
+			b.WriteString(" " + t.Reminder.String())
+		}
 	case o.When && !t.StartDate.IsZero():
 		b.WriteString(" @" + c.Date(t.StartDate))
 		if t.HasReminder {
@@ -82,6 +89,16 @@ func (c Ctx) Line(t thingsdb.Task, o LineOpts) string {
 	}
 	if o.When && t.Evening {
 		b.WriteString(" eve")
+	}
+	if o.Where && t.StartDate.IsZero() && t.Status == thingsdb.StatusOpen && !t.Trashed {
+		switch t.Start {
+		case thingsdb.StartInbox:
+			b.WriteString(" inbox")
+		case thingsdb.StartAnytime:
+			b.WriteString(" anytime")
+		case thingsdb.StartSomeday:
+			b.WriteString(" someday")
+		}
 	}
 	if !t.Deadline.IsZero() {
 		b.WriteString(" !" + c.Date(t.Deadline))
@@ -94,6 +111,16 @@ func (c Ctx) Line(t thingsdb.Task, o LineOpts) string {
 	}
 	if t.RepeatingInstance || t.RepeatingTemplate {
 		b.WriteString(" ~rep")
+	}
+	if o.Parent {
+		switch {
+		case t.HeadingTitle != "":
+			fmt.Fprintf(&b, " in:%q", t.ProjectTitle+" / "+t.HeadingTitle)
+		case t.ProjectTitle != "" && t.Kind != thingsdb.KindProject:
+			fmt.Fprintf(&b, " in:%q", t.ProjectTitle)
+		case t.AreaTitle != "":
+			fmt.Fprintf(&b, " in:%q", t.AreaTitle)
+		}
 	}
 	if o.Status {
 		switch t.Status {
