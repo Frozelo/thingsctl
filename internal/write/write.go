@@ -321,7 +321,7 @@ func (e *Env) addTodo(w *world, a command.Add) (plan, error) {
 		return plan{}, err
 	}
 	var in container
-	if a.In != "" {
+	if a.In != "" && !strings.EqualFold(a.In, "inbox") { // new to-dos land in the Inbox anyway
 		if in, err = w.resolveContainer(a.In, false); err != nil {
 			return plan{}, err
 		}

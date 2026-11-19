@@ -309,3 +309,13 @@ func TestBatch(t *testing.T) {
 		t.Errorf("dry-run = %q", out.String())
 	}
 }
+
+func TestAddInInboxMeansNoContainer(t *testing.T) {
+	e, fk, _ := setup(t)
+	if err := e.Add(ctx, command.Add{Title: "x", In: "Inbox"}); err != nil {
+		t.Fatal(err)
+	}
+	if src := fk.scripts[0]; strings.Contains(src, "project id") || strings.Contains(src, "area id") {
+		t.Errorf("inbox add must not target a container:\n%s", src)
+	}
+}
