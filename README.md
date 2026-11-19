@@ -42,3 +42,7 @@ go install github.com/Frozelo/thingsctl/cmd/thingsctl@latest
 ```
 
 thingsctl needs macOS with Things 3 installed and opened at least once. If macOS denies access to the Things database, grant Full Disk Access to the app that runs thingsctl, such as Terminal, Claude or Cursor.
+
+## License
+
+[MIT](LICENSE)
