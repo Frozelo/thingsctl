@@ -1,10 +1,35 @@
 # thingsctl
 
+[![Release](https://img.shields.io/github/v/release/Frozelo/thingsctl)](https://github.com/Frozelo/thingsctl/releases)
+[![CI](https://github.com/Frozelo/thingsctl/actions/workflows/ci.yml/badge.svg)](https://github.com/Frozelo/thingsctl/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A command-line tool and MCP server that lets AI agents work with [Things 3](https://culturedcode.com/things/) on macOS. It is designed to cost agents as few tokens as possible and to use as little CPU and memory as possible.
+
+```sh
+brew install frozelo/tap/thingsctl
+claude mcp add things -- thingsctl mcp     # or see "MCP server" for Codex, Cursor and others
+```
+
+<p align="center"><img src="docs/demo.svg" width="900" alt="An agent marks a to-do done and moves every errand to Someday with two thingsctl MCP calls"></p>
 
 > **Unofficial.** thingsctl is not affiliated with or endorsed by Cultured Code. "Things" is a trademark of Cultured Code GmbH & Co. KG.
 
-**Status:** reading, writing and the MCP server work; see [Releases](https://github.com/Frozelo/thingsctl/releases) for versions.
+## Why thingsctl
+
+Most of what an agent pays for is not the tool schema but the number of model requests: in Codex each one costs about 25k input tokens. thingsctl is built so that the common jobs take a single call, and this was measured with a real agent on a seeded database ([eval](eval/README.md)).
+
+| Job | How thingsctl does it |
+|---|---|
+| Tools | 6: `read`, `add`, `update`, `trash`, `batch`, `show`. The whole list is about 3 KB of JSON. |
+| Change one item | 1 call. Items can be named by exact title, so there is no lookup read first. |
+| Change many items | 1 call: `update {where: "tag:errand", status: "done"}`. Multi-item tasks went from 4.0 calls to 1.2. |
+| Check the result | No re-read. Every write replies with the item as Things saved it, for example `ok a3f9 Buy milk someday in:"Home"`. |
+| Output | One line per item with short ids, not JSON. |
+| Runtime | One static Go binary, about 8 MB of memory per call. No Python, Node or background process. |
+| Safety | Reads the database read-only. Writes go through Things itself and are confirmed by reading back. |
+
+Across all write tasks in the eval, these changes cut tool calls from 3.1 to 1.5 and input tokens by 29%, with no loss in success rate.
 
 ## Design
 
@@ -113,7 +138,7 @@ thingsctl doctor
 ```
 
 ```
-thingsctl 0.1.0 darwin/arm64
+thingsctl 1.0.0 darwin/arm64
 ok   database: ~/Library/Group Containers/…/main.sqlite (version 29)
 ok   schema: compatible
 warn things urls: off. Only needed to change evening, reminders, headings or checklists of existing items: …
