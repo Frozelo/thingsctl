@@ -1,0 +1,4 @@
+/thingsctl
+/dist/
+*.test
+.DS_Store
