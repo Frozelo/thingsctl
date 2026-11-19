@@ -4,7 +4,7 @@ A command-line tool and MCP server that lets AI agents work with [Things 3](http
 
 > **Unofficial.** thingsctl is not affiliated with or endorsed by Cultured Code. "Things" is a trademark of Cultured Code GmbH & Co. KG.
 
-**Status: early development.** Reading, writing and the MCP server work.
+**Status:** reading, writing and the MCP server work; see [Releases](https://github.com/Frozelo/thingsctl/releases) for versions.
 
 ## Design
 
